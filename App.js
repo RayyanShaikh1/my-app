@@ -5,9 +5,10 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createDrawerNavigator } from '@react-navigation/drawer';
+import { ScrollView } from 'react-native';
+import { ActivityIndicator } from 'react-native';
+import axios from 'axios';
 import { Ionicons } from '@expo/vector-icons';
-
-//Murali is testing push
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -56,10 +57,70 @@ function HealthScreen() {
 }
 
 function ChatScreen() {
+  const [inputText, setInputText] = useState('');
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const handleSend = async () => {
+    if (!inputText.trim()) return;
+    
+    const newMessages = [...messages, { text: inputText, sender: 'user' }];
+    setMessages(newMessages);
+    setInputText('');
+    setLoading(true);
+
+    try {
+      const response = await axios.post(
+        'https://api.openai.com/v1/chat/completions',
+        {
+          model: 'gpt-3.5-turbo',
+          messages: [
+            { role: 'system', content: 'You are a helpful assistant knowledgeable about medical topics.' },
+            { role: 'user', content: inputText }
+          ],
+        },
+        {
+          headers: {
+            'Authorization': `Bearer sk-xr5tETsk-VsHpu4Jx9E8qsEFyTKwogcmZSii1KRIlkT3BlbkFJ-paZDq5WJPXZnLP9Fxwxnjyg94Xtgu-e1FlF8rc3oA`, // Replace with your actual API key
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const reply = response.data.choices[0].message.content;
+      setMessages([...newMessages, { text: reply, sender: 'bot' }]);
+    } catch (error) {
+      setMessages([...newMessages, { text: 'Error fetching response. Please try again.', sender: 'bot' }]);
+      console.error('ChatGPT API Error:', error);
+    }
+
+    setLoading(false);
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Chat Screen</Text>
-      <Text>How Are You Doing Today?</Text>
+      <ScrollView style={styles.chatContainer}>
+        {messages.map((msg, index) => (
+          <View
+            key={index}
+            style={[
+              styles.message,
+              msg.sender === 'user' ? styles.userMessage : styles.botMessage,
+            ]}
+          >
+            <Text>{msg.text}</Text>
+          </View>
+        ))}
+      </ScrollView>
+      {loading && <ActivityIndicator size="large" color="#0000ff" />}
+      <TextInput
+        style={styles.input}
+        placeholder="Ask a medical question..."
+        value={inputText}
+        onChangeText={setInputText}
+      />
+      <Button title="Send" onPress={handleSend} />
     </View>
   );
 }

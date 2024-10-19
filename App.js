@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, TextInput, Button, Alert } from 'react-native';
+import { StyleSheet, Text, View, TextInput, Button, Alert, ScrollView, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createDrawerNavigator } from '@react-navigation/drawer';
+import OpenAI from 'openai';
 import { Ionicons } from '@expo/vector-icons';
+
+const openai = new OpenAI({ apiKey: 'YOUR_API_KEY' }); // Replace 'YOUR_API_KEY' with your actual API key
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -54,10 +57,61 @@ function HealthScreen() {
 }
 
 function ChatScreen() {
+  const [inputText, setInputText] = useState('');
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const handleSend = async () => {
+    if (!inputText.trim()) return;
+
+    const newMessages = [...messages, { text: inputText, sender: 'user' }];
+    setMessages(newMessages);
+    setInputText('');
+    setLoading(true);
+
+    try {
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini', // Replace with your desired model
+        messages: [
+          { role: 'system', content: 'You are a helpful assistant knowledgeable about medical topics.' },
+          { role: 'user', content: inputText }
+        ],
+      });
+
+      const reply = completion.choices[0].message.content; // Get the bot's reply
+      setMessages([...newMessages, { text: reply, sender: 'bot' }]);
+    } catch (error) {
+      setMessages([...newMessages, { text: 'Error fetching response. Please try again.', sender: 'bot' }]);
+      console.error('OpenAI API Error:', error);
+    }
+
+    setLoading(false);
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Chat Screen</Text>
-      <Text>How Are You Doing Today?</Text>
+      <ScrollView style={styles.chatContainer}>
+        {messages.map((msg, index) => (
+          <View
+            key={index}
+            style={[
+              styles.message,
+              msg.sender === 'user' ? styles.userMessage : styles.botMessage,
+            ]}
+          >
+            <Text>{msg.text}</Text>
+          </View>
+        ))}
+      </ScrollView>
+      {loading && <ActivityIndicator size="large" color="#0000ff" />}
+      <TextInput
+        style={styles.input}
+        placeholder="Ask a medical question..."
+        value={inputText}
+        onChangeText={setInputText}
+      />
+      <Button title="Send" onPress={handleSend} />
     </View>
   );
 }
@@ -78,7 +132,7 @@ function ProfileSettingsScreen({ navigation }) {
 
 function TabNavigator() {
   return (
-    <Tab.Navigator initialRouteName="Home">
+    <Tab.Navigator initialRouteName="Health">
       <Tab.Screen name="Health" component={HealthScreen} />
       <Tab.Screen name="Chat" component={ChatScreen} />
     </Tab.Navigator>
@@ -126,5 +180,24 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingHorizontal: 8,
     borderRadius: 5,
+  },
+  chatContainer: {
+    flex: 1,
+    width: '100%',
+    marginBottom: 12,
+  },
+  message: {
+    padding: 10,
+    borderRadius: 5,
+    marginVertical: 5,
+    maxWidth: '80%',
+  },
+  userMessage: {
+    backgroundColor: '#cce5ff',
+    alignSelf: 'flex-end',
+  },
+  botMessage: {
+    backgroundColor: '#e2e3e5',
+    alignSelf: 'flex-start',
   },
 });

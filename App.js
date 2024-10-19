@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, TextInput, Button, Alert } from 'react-native';
+import { StyleSheet, Text, View, TextInput, Button, Alert, ScrollView, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createDrawerNavigator } from '@react-navigation/drawer';
-import { ScrollView } from 'react-native';
-import { ActivityIndicator } from 'react-native';
-import axios from 'axios';
+import OpenAI from 'openai';
 import { Ionicons } from '@expo/vector-icons';
+
+const openai = new OpenAI({ apiKey: 'YOUR_API_KEY' }); // Replace 'YOUR_API_KEY' with your actual API key
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -63,35 +63,26 @@ function ChatScreen() {
 
   const handleSend = async () => {
     if (!inputText.trim()) return;
-    
+
     const newMessages = [...messages, { text: inputText, sender: 'user' }];
     setMessages(newMessages);
     setInputText('');
     setLoading(true);
 
     try {
-      const response = await axios.post(
-        'https://api.openai.com/v1/chat/completions',
-        {
-          model: 'gpt-3.5-turbo',
-          messages: [
-            { role: 'system', content: 'You are a helpful assistant knowledgeable about medical topics.' },
-            { role: 'user', content: inputText }
-          ],
-        },
-        {
-          headers: {
-            'Authorization': `Bearer sk-xr5tETsk-VsHpu4Jx9E8qsEFyTKwogcmZSii1KRIlkT3BlbkFJ-paZDq5WJPXZnLP9Fxwxnjyg94Xtgu-e1FlF8rc3oA`, // Replace with your actual API key
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini', // Replace with your desired model
+        messages: [
+          { role: 'system', content: 'You are a helpful assistant knowledgeable about medical topics.' },
+          { role: 'user', content: inputText }
+        ],
+      });
 
-      const reply = response.data.choices[0].message.content;
+      const reply = completion.choices[0].message.content; // Get the bot's reply
       setMessages([...newMessages, { text: reply, sender: 'bot' }]);
     } catch (error) {
       setMessages([...newMessages, { text: 'Error fetching response. Please try again.', sender: 'bot' }]);
-      console.error('ChatGPT API Error:', error);
+      console.error('OpenAI API Error:', error);
     }
 
     setLoading(false);
@@ -141,7 +132,7 @@ function ProfileSettingsScreen({ navigation }) {
 
 function TabNavigator() {
   return (
-    <Tab.Navigator initialRouteName="Home">
+    <Tab.Navigator initialRouteName="Health">
       <Tab.Screen name="Health" component={HealthScreen} />
       <Tab.Screen name="Chat" component={ChatScreen} />
     </Tab.Navigator>
@@ -189,5 +180,24 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingHorizontal: 8,
     borderRadius: 5,
+  },
+  chatContainer: {
+    flex: 1,
+    width: '100%',
+    marginBottom: 12,
+  },
+  message: {
+    padding: 10,
+    borderRadius: 5,
+    marginVertical: 5,
+    maxWidth: '80%',
+  },
+  userMessage: {
+    backgroundColor: '#cce5ff',
+    alignSelf: 'flex-end',
+  },
+  botMessage: {
+    backgroundColor: '#e2e3e5',
+    alignSelf: 'flex-start',
   },
 });
